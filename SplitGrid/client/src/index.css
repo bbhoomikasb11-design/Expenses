@@ -1,0 +1,73 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-cream: #f1f0e8;
+  --container-violet: #3d3b73;
+  --card-peach: #fbd38d;
+  --highlight-gold: #fbbf24;
+  --deep-card-violet: #2e2a56;
+  --text-white: #ffffff;
+  --text-sub: #a5b4fc;
+}
+
+body {
+  background-color: var(--bg-cream);
+  font-family: 'Outfit', sans-serif;
+  color: var(--text-white);
+  min-height: 100vh;
+  margin: 0;
+  overflow-x: hidden;
+}
+
+/* Base Headings */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--highlight-gold);
+  font-weight: 600;
+}
+
+/* Base Focus Outlines for Accessibility without breaking border radius */
+*:focus-visible {
+  outline: 2px solid var(--highlight-gold);
+  outline-offset: 2px;
+}
+
+/* Accent Card: Peach */
+.card-peach {
+  background-color: var(--card-peach);
+  color: #1e1b4b; /* High contrast text */
+  border-radius: 1.5rem;
+  /* Reduced shadow footprint compared to initial plan to fix GPU lag */
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+.card-peach h1, .card-peach h2, .card-peach h3 {
+  color: #78350f;
+}
+
+/* Deep Cards: Violet */
+.card-deep {
+  background-color: var(--deep-card-violet);
+  border-radius: 1.5rem;
+  /* Smoothed inset shadow */
+  box-shadow: inset 0 4px 10px rgba(0, 0, 0, 0.15), 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* App Container */
+.app-container {
+  background-color: var(--container-violet);
+  border-radius: 2rem;
+  box-shadow: 0 20px 40px -10px rgba(61, 59, 115, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
