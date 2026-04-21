@@ -1,86 +1,86 @@
-# SplitGrid
+# SplitGrid 💸
 
-**SplitGrid** is a premium, real-time expense-sharing and debt-settlement platform built for groups that move fast. It goes beyond standard expense trackers by utilizing **MongoDB Change Streams** and **Socket.io** to synchronize debts across users instantly—without any browser refreshes.
+**SplitGrid** is a premium, real-time expense-sharing and debt-settlement platform designed for groups that move fast. It leverages **MongoDB Change Streams** and **Socket.io** to synchronize debts across users instantly—without any browser refreshes.
 
-Designed with an ultra-modern `"Floating Glass"` aesthetic inspired by Apple and Linear.app, SplitGrid strips away rigid boxes and cluttered lists in favor of an immersive, spacial UI loaded with backdrop blurs, soft lighting, and sharp typography.
+Designed with an ultra-modern `"Floating Glass"` aesthetic, SplitGrid features an immersive UI loaded with backdrop blurs, soft lighting, and sharp typography, inspired by top-tier fintech applications.
 
 ---
 
 ## 🎯 The Concept
 
-Managing group expenses (like trips, dinners, or roommates) often devolves into chaotic spreadsheets and constant "who owes who" confusion. SplitGrid solves this by:
-1. **Frictionless Onboarding**: No sign-ups required. Instantly create a group space and share the URL.
-2. **Intelligent Debt Parsing**: When an expense is dumped into the system, SplitGrid's internal graph algorithm minimizes group debts. It simplifies a complex web of "A owes B, B owes C" into the fewest direct transactions possible (e.g., A owes C).
-3. **True Real-time**: When your friend adds an expense from their phone, it instantly materializes on your screen, complete with updated debt charts and settlement graphs.
+Managing group expenses often leads to confusion and tedious manual math. SplitGrid solves this by:
+1. **Instant Group Creation**: No registration required. Create a group, invite friends via a unique ID, and start tracking immediately.
+2. **Real-Time Debt Tracking**: See balances update live as expenses are added or settled.
+3. **Smart Settlements**: Record payments between members to clear debts instantly.
+4. **Data Persistence**: Powered by MongoDB for reliable storage and real-time event streaming.
 
 ---
 
 ## 🛠 Tech Stack
 
-### Frontend Architecture (Client)
-- **Framework**: React 19 + Vite for rapid HMR and lightweight bundling.
-- **Styling**: Tailwind CSS v4, utilizing deep obsidian blues, soft radial gradients, and heavy glassmorphic blurs (`backdrop-blur`).
-- **Icons & Typography**: `lucide-react` for minimalist vectors and `Inter` for highly legible, premium typography.
-- **Animations**: `framer-motion` for buttery smooth ingress animations and micro-interactions.
-- **State & Routing**: React Router DOM (v7) and React Context API for localized group caching.
-- **Visuals**: `canvas-confetti` (for celebrations on settlement) and `recharts` for 60-FPS financial breakdown graphs.
+### Frontend Architecture
+- **Framework**: [React 19](https://react.dev/) + [Vite](https://vitejs.dev/) for ultra-fast development.
+- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/) featuring deep obsidian themes and glassmorphic effects.
+- **Interactions**: [Framer Motion](https://www.framer.com/motion/) for smooth layout transitions and micro-animations.
+- **Real-time**: `socket.io-client` for persistent bidirectional communication.
 
-### Backend Architecture (Server)
+### Backend Architecture
 - **Runtime**: Node.js & Express.js.
 - **Database**: MongoDB & Mongoose.
-- **Real-Time Engine**: `Socket.io` working in tandem with **MongoDB Change Streams**. (Whenever a database document is updated, the change stream triggers an immediate push event over web sockets to broadcast the payload to all connected clients natively).
+- **Live Sync**: `Socket.io` paired with **MongoDB Change Streams**. This ensures that any data modification in the database is automatically broadcasted to all active participants in a group room.
 
 ---
 
 ## 🚀 Quick Setup & Installation
 
-> **CRITICAL DATABASE REQUIREMENT**
-> You **must** be connected to a MongoDB instance configured as a **Replica Set**. SplitGrid's real-time features rely on MongoDB Change Streams, which do not function on standard standalone local installations out of the box. 
-> 
-> **Solution**: The easiest and most reliable method is to grab a free tier cluster string from **MongoDB Atlas** (which provisions replica sets by default).
+### Prerequisites
+- **MongoDB Replica Set**: Required for Change Streams. Use **MongoDB Atlas** (free tier) for the easiest setup.
+- **Node.js**: Version 18 or higher.
 
-### 1. Database Configuration
-1. Obtain your MongoDB Atlas connection string: `mongodb+srv://<username>:<password>@cluster...`
-2. Create or edit the environment file at `/server/.env`:
+### 1. Environment Configuration
+Create a `.env` file in the `/server` directory:
 ```bash
-MONGO_URI=your_atlas_replica_set_connection_string
+MONGO_URI=your_mongodb_connection_string
 PORT=5000
 ```
 
 ### 2. Install Dependencies
-Run the installation commands for both the client and the server:
 ```bash
-# Backend Server
+# Install server dependencies
 cd server
 npm install
 
-# Frontend Client
-cd ../client
+# Install frontend dependencies
+cd ../frontend
 npm install
 ```
 
-### 3. Boot Application Environment
-SplitGrid requires both the client and server to be running simultaneously to stream sockets properly.
+### 3. Run the Application
+Open two terminal windows:
 
 **Terminal 1 (Backend Server)**
 ```bash
 cd server
-node server.js
-# Runs the API & Socket gateway on port 5000
+npm start # or node server.js
 ```
 
 **Terminal 2 (Frontend Client)**
 ```bash
-cd client
+cd frontend
 npm run dev
-# Vite serves the React SPA locally at port 5173
 ```
+Access the application at `http://localhost:5173`.
 
 ---
 
-## 💫 Core Features At a Glance
+## 💫 Core Features
 
-* **Floating Glass UI**: Visually stunning dashboard avoiding harsh grid lines; designed purely with light rims and deep depth-of-field blurs.
-* **Instant Propagation**: Built strictly for speed. Zero manual syncing or refetching operations.
-* **Greedy Graph Minimization**: Internal algorithms automatically reduce complex group debts to streamline settlements into single-tap workflows.
-* **Demo Environment**: Exposes an automatic `/api/groups/demo` endpoint to instantly spin up a populated mock presentation room.
+* **Floating Glass UI**: A premium, borderless design system with high-end visual polish.
+* **Instant Propagation**: Built on events, not polling. Updates arrive in milliseconds.
+* **Member Invites**: Join groups via unique IDs and shareable invite screens.
+* **Dynamic Balances**: Rolling balance calculation engine that accounts for all group transactions and settlements.
+* **Detailed Activity**: Track who paid for what and when with a clear historical log.
+
+---
+
+For a deeper dive into the technical implementation, see [CONCEPTS.md](CONCEPTS.md).
