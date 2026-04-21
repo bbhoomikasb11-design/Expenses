@@ -5,6 +5,33 @@ import { ChevronDown, AlertTriangle, Navigation, Search, Clock, Plus, X, Receipt
 import toast from 'react-hot-toast';
 import { useGroup } from '../context/GroupContext';
 
+const simplifyDebts = (balancesMap) => {
+  if (!balancesMap) return [];
+  const debtors = [];
+  const creditors = [];
+  for (const [name, balance] of Object.entries(balancesMap)) {
+    if (balance < -0.01) debtors.push({ name, amount: -balance });
+    else if (balance > 0.01) creditors.push({ name, amount: balance });
+  }
+  debtors.sort((a, b) => b.amount - a.amount);
+  creditors.sort((a, b) => b.amount - a.amount);
+
+  let i = 0;
+  let j = 0;
+  const transactions = [];
+  while (i < debtors.length && j < creditors.length) {
+    const debtor = debtors[i];
+    const creditor = creditors[j];
+    const amount = Math.min(debtor.amount, creditor.amount);
+    transactions.push({ from: debtor.name, to: creditor.name, amount });
+    debtor.amount -= amount;
+    creditor.amount -= amount;
+    if (debtor.amount < 0.01) i++;
+    if (creditor.amount < 0.01) j++;
+  }
+  return transactions;
+};
+
 const GroupDashboard = () => {
   const { id } = useParams();
   const { group, loading, addExpense, deleteExpense, socket } = useGroup();
@@ -12,6 +39,7 @@ const GroupDashboard = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedFriends, setSelectedFriends] = useState([]);
   const [socketStatus, setSocketStatus] = useState(socket?.connected ? 'connected' : 'connecting');
+  const [me, setMe] = useState('');
 
   // Add Expense form states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -41,6 +69,15 @@ const GroupDashboard = () => {
       if(selectedFriends.length === 0) setSelectedFriends([group.members[0].name]);
     }
   }, [group, expensePayer]);
+
+  useEffect(() => {
+    if (!group?.members?.length) return;
+    const key = `splitgrid.me.${id}`;
+    const stored = localStorage.getItem(key);
+    const initial = stored && group.members.some((m) => m.name === stored) ? stored : group.members[0].name;
+    setMe(initial);
+    localStorage.setItem(key, initial);
+  }, [group?.members, id]);
 
   if (loading || !group) {
     return (
@@ -77,6 +114,8 @@ const GroupDashboard = () => {
   const totalSpent = group.expenses.reduce((sum, exp) => sum + exp.amount, 0);
   const sortedExpenses = [...group.expenses].sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
   const lastExpense = sortedExpenses.length > 0 ? sortedExpenses[0] : null;
+  const myBalance = me && group.balances ? Number(group.balances[me] ?? 0) : 0;
+  const debtSummary = simplifyDebts(group.balances || {});
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-12 relative overflow-hidden bg-[var(--bg-cream)]">
@@ -86,10 +125,28 @@ const GroupDashboard = () => {
         <header className="flex justify-between items-center w-full mb-8">
           <div className="flex flex-col">
             <span className="text-[var(--text-sub)] text-sm md:text-base tracking-wider uppercase font-semibold flex items-center gap-2">
-               Jarvish 
+               Live Sync
                <div className={`w-2 h-2 rounded-full ${socketStatus === 'connected' ? 'bg-green-400 shadow-[0_0_8px_#4ade80]' : 'bg-red-400'}`} title="Live Sync Status" />
             </span>
             <h1 className="text-3xl md:text-4xl text-[var(--highlight-gold)] font-bold mt-1 max-w-[200px] md:max-w-md truncate">{group.groupName}</h1>
+            <div className="mt-3 flex items-center gap-3">
+              <span className="text-xs text-[var(--text-sub)] font-bold uppercase tracking-widest">You are</span>
+              <select
+                value={me}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setMe(next);
+                  localStorage.setItem(`splitgrid.me.${id}`, next);
+                }}
+                className="bg-[var(--deep-card-violet)] border border-white/10 rounded-xl px-3 py-2 text-white text-sm font-semibold outline-none focus:border-[var(--highlight-gold)]"
+              >
+                {group.members.map((m) => (
+                  <option key={m.name} value={m.name}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="flex flex-col items-center cursor-pointer hover:opacity-80 transition-opacity">
             <div className="w-12 h-12 md:w-14 md:h-14 bg-gray-200 rounded-full flex justify-center items-center overflow-hidden shadow-lg border-2 border-transparent hover:border-[var(--highlight-gold)] transition-colors">
@@ -98,11 +155,18 @@ const GroupDashboard = () => {
           </div>
         </header>
 
-        {/* Dynamic Peach Card */}
+        {/* Dynamic Balance Card */}
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="card-peach w-full p-6 md:p-8 flex items-stretch justify-between mb-6 relative z-20 shadow-2xl">
           <div className="flex flex-col justify-center">
-            <p className="text-amber-900/60 font-semibold text-sm md:text-base uppercase tracking-wider mb-2">Total Bill</p>
-            <div className="text-4xl md:text-5xl font-extrabold text-[#78350f]">₹ {totalSpent.toFixed(2)}</div>
+            <p className="text-amber-900/60 font-semibold text-sm md:text-base uppercase tracking-wider mb-2">Your Balance</p>
+            {myBalance < -0.01 ? (
+              <div className="text-4xl md:text-5xl font-extrabold text-red-700">You owe ₹ {Math.ceil(Math.abs(myBalance))}</div>
+            ) : myBalance > 0.01 ? (
+              <div className="text-4xl md:text-5xl font-extrabold text-green-700">You get ₹ {Math.ceil(myBalance)}</div>
+            ) : (
+              <div className="text-4xl md:text-5xl font-extrabold text-[#78350f]">All settled up 🎉</div>
+            )}
+            <p className="text-amber-900/60 font-semibold text-sm mt-3">Group total: ₹ {totalSpent.toFixed(2)}</p>
           </div>
           
           <div className="flex flex-col items-end relative">
@@ -166,7 +230,7 @@ const GroupDashboard = () => {
           <div className="flex flex-col">
              <div className="flex justify-between items-center mb-5">
                <h3 className="text-white font-semibold flex items-center gap-2 text-lg"><Navigation size={18} className="text-[var(--text-sub)]"/> Group Members</h3>
-               <Link to={`/settle/${id}`} className="text-[var(--highlight-gold)] text-sm cursor-pointer hover:text-white transition font-bold uppercase tracking-wider bg-white/5 px-3 py-1 rounded-full">Settle Up →</Link>
+               <Link to={`/settle/${id}`} className="text-[var(--highlight-gold)] text-sm cursor-pointer hover:text-white transition font-bold uppercase tracking-wider bg-white/5 px-3 py-1 rounded-full">Debts & History →</Link>
              </div>
              <div className="flex justify-between md:justify-start gap-4 md:gap-6 overflow-x-auto pb-4 scrollbar-hide shrink-0">
                 <div className="flex flex-col items-center gap-3">
@@ -202,6 +266,35 @@ const GroupDashboard = () => {
              </div>
           </div>
 
+        </div>
+
+        {/* Debt Summary (computed, no mock data) */}
+        <div className="mt-10 w-full">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-white font-semibold text-lg">Debt Summary</h3>
+            <Link to={`/settle/${id}`} className="text-[var(--highlight-gold)] text-sm font-bold uppercase tracking-wider hover:text-white transition">
+              Settle →
+            </Link>
+          </div>
+          {debtSummary.length === 0 ? (
+            <div className="p-6 rounded-2xl bg-white/5 border border-white/10 text-[var(--text-sub)] font-medium text-center">
+              No active debts. Add an expense to see the split.
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {debtSummary.slice(0, 6).map((tx) => (
+                <div key={`${tx.from}-${tx.to}`} className="p-4 rounded-2xl bg-[var(--deep-card-violet)] border border-white/10 flex justify-between items-center">
+                  <div className="text-white font-semibold">
+                    <span className="text-[var(--text-sub)]">{tx.from}</span> pays <span className="text-[var(--highlight-gold)]">{tx.to}</span>
+                  </div>
+                  <div className="text-[var(--highlight-gold)] font-extrabold">₹ {Math.ceil(tx.amount)}</div>
+                </div>
+              ))}
+              {debtSummary.length > 6 && (
+                <div className="text-center text-[var(--text-sub)] text-sm">+ {debtSummary.length - 6} more…</div>
+              )}
+            </div>
+          )}
         </div>
 
       </main>

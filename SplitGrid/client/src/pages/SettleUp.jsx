@@ -4,7 +4,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, MoreVertical, CheckCircle2 } from 'lucide-react';
 import { useGroup } from '../context/GroupContext';
 import toast from 'react-hot-toast';
-import axios from 'axios';
 
 const simplifyDebts = (balancesMap) => {
   if (!balancesMap) return [];
@@ -99,16 +98,14 @@ const SwipeSettle = ({ tx, settled, onSettle }) => {
 const SettleUp = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { group, loading, setGroup } = useGroup();
+  const { group, loading, addSettlement } = useGroup();
   const [settledUsers, setSettledUsers] = useState({});
   const [isSettling, setIsSettling] = useState(false);
 
   useEffect(() => {
-    if (group?.balances) {
-      // Clear settled state when group balances change unexpectedly (reloaded)
-      setSettledUsers({});
-    }
-  }, [group?.id]);
+    // Clear local slider states when balances change (socket update / refresh)
+    setSettledUsers({});
+  }, [group?.balances]);
 
   if (loading || !group) {
     return <div className="min-h-screen app-container flex items-center justify-center text-[var(--highlight-gold)] tracking-widest font-bold">Fetching Ledgers...</div>;
@@ -125,13 +122,20 @@ const SettleUp = () => {
     if (Object.keys(settledUsers).length === 0) return toast('Slide a bar to settle first!', { icon: '🤔' });
     setIsSettling(true);
     
-    // In a real app we'd dispatch specific settle transactions.
-    // For demo mapping, we will trigger an optimistic toast indicating ledger updates over Mongo.
-    setTimeout(() => {
-      setIsSettling(false);
-      toast.success('Blockchain ledger synced. Debts cleared!', { style: { background: '#13131A', color: '#00F5A0'} });
+    try {
+      const txsToSettle = transactions.filter((tx) => settledUsers[`${tx.from}-${tx.to}`]);
+      for (const tx of txsToSettle) {
+        await addSettlement({ from: tx.from, to: tx.to, amount: Math.ceil(tx.amount) });
+      }
+      toast.success('Settlements saved. Balances updated.', {
+        style: { background: '#13131A', color: '#00F5A0', border: '1px solid #00F5A0' }
+      });
       navigate(`/group/${id}`);
-    }, 1500);
+    } catch (e) {
+      toast.error('Failed to settle. Please try again.');
+    } finally {
+      setIsSettling(false);
+    }
   };
 
   return (
@@ -211,6 +215,32 @@ const SettleUp = () => {
                    </motion.div>
                  )
                })
+            )}
+          </div>
+
+          {/* History (settlements only) */}
+          <div className="mt-6">
+            <h3 className="text-white font-semibold mb-3">History</h3>
+            {(group.settlements?.length || 0) === 0 ? (
+              <div className="text-center p-6 border border-white/10 rounded-2xl bg-white/5 text-[var(--text-sub)] font-medium">
+                No settlements yet
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {[...group.settlements]
+                  .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                  .map((s, idx) => (
+                    <div key={`${s.from}-${s.to}-${idx}`} className="p-4 rounded-2xl bg-[var(--deep-card-violet)] border border-white/10 flex justify-between items-center">
+                      <div className="text-white font-semibold">
+                        <span className="text-[var(--text-sub)]">{s.from}</span> paid <span className="text-[var(--highlight-gold)]">{s.to}</span>
+                        <div className="text-xs text-[var(--text-sub)] mt-1">
+                          {new Date(s.timestamp).toLocaleString()}
+                        </div>
+                      </div>
+                      <div className="text-[var(--highlight-gold)] font-extrabold">₹ {Math.ceil(s.amount)}</div>
+                    </div>
+                  ))}
+              </div>
             )}
           </div>
 

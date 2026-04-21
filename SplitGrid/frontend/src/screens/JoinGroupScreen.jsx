@@ -7,16 +7,24 @@ export default function JoinGroupScreen({ onBack, onJoin }) {
   const { joinGroup } = useApp();
   const [input, setInput] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleJoin = () => {
+  const handleJoin = async () => {
     setError('');
-    if (!input.trim()) return;
+    if (!input.trim() || loading) return;
 
-    const success = joinGroup(input.trim());
-    if (success) {
-      onJoin();
-    } else {
-      setError('Group not found. Check the code or link.');
+    setLoading(true);
+    try {
+      const success = await joinGroup(input.trim());
+      if (success) {
+        onJoin();
+      } else {
+        setError('Group not found. Check the code or link.');
+      }
+    } catch (e) {
+      setError(e?.message || 'Join failed. Check the code or link.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -92,7 +100,7 @@ export default function JoinGroupScreen({ onBack, onJoin }) {
             onClick={handleJoin}
             style={{ marginTop: '12px' }}
           >
-            Join Group
+            {loading ? 'Joining...' : 'Join Group'}
           </button>
         </motion.div>
       </div>

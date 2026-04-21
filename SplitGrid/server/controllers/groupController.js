@@ -8,9 +8,48 @@ exports.createGroup = async (req, res) => {
   try {
     const { groupName, emoji, groupType, members } = req.body;
     const group = new Group({ groupName, emoji, groupType, members });
+    // referralCode = first 6 chars of groupId (uppercase). We set it after _id exists.
+    group.referralCode = String(group._id).slice(0, 6).toUpperCase();
     group.balances = recalculateBalances(group);
     await group.save();
     res.status(201).json(group);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.lookupGroupByReferral = async (req, res) => {
+  try {
+    const code = String(req.params.code || '').toUpperCase();
+    if (!code || code.length < 4) return res.status(400).json({ error: 'Invalid referral code' });
+    const group = await Group.findOne({ referralCode: code }).select('_id referralCode groupName');
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+    res.json(group);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.addMember = async (req, res) => {
+  try {
+    const group = await Group.findById(req.params.id);
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+
+    const name = String(req.body?.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'Member name required' });
+    if (group.members.some((m) => m.name.toLowerCase() === name.toLowerCase())) {
+      return res.status(409).json({ error: 'Member already exists' });
+    }
+
+    const newMember = {
+      name,
+      avatar: req.body?.avatar,
+      mobileNumber: req.body?.mobileNumber
+    };
+    group.members.push(newMember);
+    group.balances = recalculateBalances(group);
+    await group.save();
+    res.status(200).json(group);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

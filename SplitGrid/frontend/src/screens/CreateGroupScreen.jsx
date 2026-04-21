@@ -6,11 +6,21 @@ import { useApp } from '../context/AppContext';
 export default function CreateGroupScreen({ onBack, onNext }) {
   const { createGroup } = useApp();
   const [value, setValue] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleCreate = () => {
-    if (value.trim()) {
-      createGroup(value.trim());
+  const handleCreate = async () => {
+    const name = value.trim();
+    if (!name || loading) return;
+    setError('');
+    setLoading(true);
+    try {
+      await createGroup(name);
       onNext();
+    } catch (e) {
+      setError(e?.message || 'Failed to create group');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -80,12 +90,18 @@ export default function CreateGroupScreen({ onBack, onNext }) {
             style={{ marginBottom: '24px' }}
           />
 
+          {error && (
+            <p style={{ color: '#ff6b6b', fontSize: '12px', marginBottom: '14px', fontWeight: '600' }}>
+              {error}
+            </p>
+          )}
+
           <button
             className="btn-primary"
             disabled={!value.trim()}
             onClick={handleCreate}
           >
-            Create Group
+            {loading ? 'Creating...' : 'Create Group'}
           </button>
         </motion.div>
       </div>

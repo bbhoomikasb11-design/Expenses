@@ -2,7 +2,6 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { createDemoGroup } from '../api';
 import { Users, ReceiptText, Zap, Activity, Calculator, MousePointerClick, BarChart3 } from 'lucide-react';
 
 const Home = () => {

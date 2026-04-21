@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
+import { io } from 'socket.io-client';
+import { api } from '../api';
 
 const AppContext = createContext(null);
 
-// Utility to generate IDs
-const generateId = () => Math.random().toString(36).substring(2, 11);
-const generateReferralCode = (id) => id.substring(0, 6).toUpperCase();
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 // Greedy debt-simplification:
 // Returns array of { from, fromId, to, toId, amount }
@@ -52,23 +52,10 @@ function simplifyDebts(balancesMap, members) {
 }
 
 export function AppProvider({ children }) {
-  // Database of all groups
-  const [groups, setGroups] = useState(() => {
-    const saved = localStorage.getItem('splitgrid_groups');
-    return saved ? JSON.parse(saved) : {};
-  });
-
-  // Current active group ID
-  const [activeGroupId, setActiveGroupId] = useState(() => {
-    return localStorage.getItem('splitgrid_active_group_id') || null;
-  });
+  const [activeGroupId, setActiveGroupId] = useState(() => localStorage.getItem('splitgrid_active_group_id') || null);
+  const [group, setGroup] = useState(null);
 
   const [activeTab, setActiveTab] = useState('members');
-
-  // Persistence Effects
-  useEffect(() => {
-    localStorage.setItem('splitgrid_groups', JSON.stringify(groups));
-  }, [groups]);
 
   useEffect(() => {
     if (activeGroupId) {
@@ -78,124 +65,134 @@ export function AppProvider({ children }) {
     }
   }, [activeGroupId]);
 
-  // Current Group Data
-  const currentGroup = groups[activeGroupId] || {
-    name: '',
-    members: [],
-    expenses: [],
-    settlements: [],
-    referralCode: '',
-  };
-
-  const { name, members, expenses, settlements, referralCode } = currentGroup;
-
-  // Helpers to update current group
-  const updateCurrentGroup = (updates) => {
+  // Real-time group sync (MongoDB Change Streams -> socket.io -> UI)
+  useEffect(() => {
     if (!activeGroupId) return;
-    setGroups(prev => ({
-      ...prev,
-      [activeGroupId]: { ...prev[activeGroupId], ...updates }
+    const socket = io(API_BASE, { autoConnect: true });
+    socket.emit('join-group', activeGroupId);
+    socket.on('group-updated', (updated) => {
+      if (updated && String(updated._id) === String(activeGroupId)) setGroup(updated);
+    });
+    return () => socket.close();
+  }, [activeGroupId]);
+
+  // Load active group on refresh
+  useEffect(() => {
+    if (!activeGroupId) return;
+    api
+      .getGroup(activeGroupId)
+      .then((g) => setGroup(g))
+      .catch(() => {
+        setActiveGroupId(null);
+        setGroup(null);
+      });
+  }, [activeGroupId]);
+
+  const members = useMemo(() => {
+    const list = group?.members || [];
+    return list.map((m) => ({ id: m.name, name: m.name }));
+  }, [group?.members]);
+
+  const expenses = useMemo(() => {
+    const list = group?.expenses || [];
+    return list.map((e) => ({
+      id: e.id,
+      description: e.item,
+      amount: e.amount,
+      paidBy: e.paidBy,
+      splitBetween: e.splitAmong || [],
+      timestamp: e.timestamp
     }));
-  };
+  }, [group?.expenses]);
+
+  const settlements = useMemo(() => {
+    const list = group?.settlements || [];
+    return list.map((s) => ({
+      id: `${s.from}-${s.to}-${s.timestamp}`,
+      from: s.from,
+      fromId: s.from,
+      to: s.to,
+      toId: s.to,
+      amount: s.amount,
+      settledAt: s.timestamp
+    }));
+  }, [group?.settlements]);
+
+  const groupName = group?.groupName || '';
+  const referralCode = group?.referralCode || (activeGroupId ? String(activeGroupId).slice(0, 6).toUpperCase() : '');
 
   // ---------- Group Management ----------
-  const createGroup = (groupName) => {
-    const id = generateId();
-    const code = generateReferralCode(id);
-    const newGroup = {
-      id,
-      name: groupName,
-      referralCode: code,
-      members: [],
-      expenses: [],
-      settlements: [],
-    };
-    setGroups(prev => ({ ...prev, [id]: newGroup }));
-    setActiveGroupId(id);
-    return id;
+  const createGroup = async (name) => {
+    const g = await api.createGroup({ groupName: name });
+    setActiveGroupId(g._id);
+    setGroup(g);
+    return g._id;
   };
 
-  const joinGroup = (input) => {
-    const idToJoin = input.includes('/join/') 
-      ? input.split('/join/')[1] 
-      : Object.keys(groups).find(id => groups[id].referralCode === input.toUpperCase());
+  const joinGroup = async (input) => {
+    const raw = String(input || '').trim();
+    if (!raw) return false;
 
-    if (idToJoin && groups[idToJoin]) {
-      setActiveGroupId(idToJoin);
-      return true;
+    const match = raw.match(/\/join\/([a-f0-9]{24})/i);
+    const idFromLink = match?.[1];
+    const idFromPaste = /^[a-f0-9]{24}$/i.test(raw) ? raw : null;
+
+    let groupId = idFromLink || idFromPaste;
+    if (!groupId) {
+      const code = raw.toUpperCase();
+      const lookedUp = await api.lookupByCode(code);
+      groupId = lookedUp?._id;
     }
-    return false;
+
+    if (!groupId) return false;
+    const g = await api.getGroup(groupId);
+    setActiveGroupId(groupId);
+    setGroup(g);
+    return true;
   };
 
   // ---------- Members ----------
-  const addMember = (memberName) => {
-    if (!memberName.trim()) return;
-    const exists = members.find(m => m.name.toLowerCase() === memberName.trim().toLowerCase());
-    if (exists) return;
-
-    const newMember = { id: Date.now().toString(), name: memberName.trim() };
-    updateCurrentGroup({ members: [...members, newMember] });
+  const addMember = async (memberName) => {
+    if (!activeGroupId) return;
+    const name = String(memberName || '').trim();
+    if (!name) return;
+    const g = await api.addMember(activeGroupId, { name });
+    setGroup(g);
   };
 
-  const removeMember = (id) => {
-    updateCurrentGroup({
-      members: members.filter(m => m.id !== id),
-      expenses: expenses.filter(e => e.paidBy !== id && !e.splitBetween.includes(id)),
-      settlements: settlements.filter(s => s.fromId !== id && s.toId !== id)
-    });
-  };
+  // Note: backend doesn't support member removal yet. Keep UI simple.
+  const removeMember = () => {};
 
   // ---------- Expenses ----------
-  const addExpense = (expense) => {
-    const newExpense = { id: Date.now().toString(), ...expense, timestamp: Date.now() };
-    updateCurrentGroup({ expenses: [newExpense, ...expenses] });
+  const addExpense = async (expense) => {
+    if (!activeGroupId) return;
+    const g = await api.addExpense(activeGroupId, expense);
+    setGroup(g);
   };
 
-  const removeExpense = (id) => {
-    updateCurrentGroup({
-      expenses: expenses.filter(e => e.id !== id)
-    });
+  const removeExpense = async (id) => {
+    if (!activeGroupId) return;
+    const g = await api.removeExpense(activeGroupId, id);
+    setGroup(g);
   };
 
   // ---------- Settle ----------
-  const settle = (debt) => {
-    const newSettlement = {
-      ...debt,
-      id: Date.now().toString(),
-      settledAt: new Date().toISOString(),
-    };
-    updateCurrentGroup({ settlements: [newSettlement, ...settlements] });
+  const settle = async (debt) => {
+    if (!activeGroupId) return;
+    const g = await api.settle(activeGroupId, { from: debt.from, to: debt.to, amount: debt.amount });
+    setGroup(g);
   };
 
   // ---------- Derived: balances ----------
   const balances = useMemo(() => {
+    // Use backend-calculated balances (Mongo persisted)
+    const raw = group?.balances || {};
     const map = {};
-    members.forEach((m) => { map[m.id] = 0; });
-
-    // 1. Process Expenses
-    expenses.forEach((exp) => {
-      const splitCount = exp.splitBetween.length;
-      if (splitCount === 0) return;
-      const share = exp.amount / splitCount;
-
-      // Payer gains the full amount
-      map[exp.paidBy] = (map[exp.paidBy] ?? 0) + exp.amount;
-      // Everyone in split owes their share
-      exp.splitBetween.forEach((mid) => {
-        map[mid] = (map[mid] ?? 0) - share;
-      });
+    members.forEach((m) => {
+      map[m.id] = Number(raw[m.name] ?? 0);
     });
-
-    // 2. Process Settlements
-    settlements.forEach((s) => {
-      // The person who paid (fromId) "gains" balance (reduces debt)
-      map[s.fromId] = (map[s.fromId] ?? 0) + s.amount;
-      // The person who received (toId) "loses" balance (already got paid back)
-      map[s.toId] = (map[s.toId] ?? 0) - s.amount;
-    });
-
     return map;
-  }, [expenses, members, settlements]);
+  }, [group?.balances, members]);
 
   // ---------- Derived: active debts (suggested by engine) ----------
   const debts = useMemo(() => simplifyDebts(balances, members), [balances, members]);
@@ -207,7 +204,7 @@ export function AppProvider({ children }) {
     <AppContext.Provider
       value={{
         groupId: activeGroupId,
-        groupName: name,
+        groupName,
         referralCode,
         members,
         expenses,

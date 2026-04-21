@@ -7,11 +7,21 @@ import { useApp } from '../context/AppContext';
 export default function AddMembersScreen({ onBack, onNext }) {
   const { members, addMember, removeMember, groupName } = useApp();
   const [input, setInput] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleAdd = () => {
-    if (input.trim()) {
-      addMember(input.trim());
+  const handleAdd = async () => {
+    const name = input.trim();
+    if (!name || saving) return;
+    setError('');
+    setSaving(true);
+    try {
+      await addMember(name);
       setInput('');
+    } catch (e) {
+      setError(e?.message || 'Failed to add member');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -87,6 +97,12 @@ export default function AddMembersScreen({ onBack, onNext }) {
               +
             </button>
           </div>
+
+          {error && (
+            <p style={{ color: '#ff6b6b', fontSize: '12px', marginBottom: '16px', fontWeight: '600' }}>
+              {error}
+            </p>
+          )}
 
           {/* Member Chips */}
           <AnimatePresence>

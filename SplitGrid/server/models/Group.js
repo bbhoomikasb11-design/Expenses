@@ -27,6 +27,7 @@ const settlementSchema = new mongoose.Schema({
 }, { _id: false });
 
 const groupSchema = new mongoose.Schema({
+  referralCode: { type: String, index: true },
   groupName: { type: String, required: true },
   emoji: { type: String, default: '🏠' },
   groupType: { 

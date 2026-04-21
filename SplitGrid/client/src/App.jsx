@@ -5,6 +5,8 @@ import Home from './pages/Home';
 import CreateGroup from './pages/CreateGroup';
 import GroupDashboard from './pages/GroupDashboard';
 import SettleUp from './pages/SettleUp';
+import Invite from './pages/Invite';
+import Join from './pages/Join';
 import { GroupProvider } from './context/GroupContext';
 
 function App() {
@@ -22,6 +24,9 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/create" element={<CreateGroup />} />
+        <Route path="/invite/:id" element={<Invite />} />
+        <Route path="/join" element={<Join />} />
+        <Route path="/join/:id" element={<Join />} />
         
         <Route element={<GroupProvider />}>
           <Route path="/group/:id" element={<GroupDashboard />} />

@@ -35,13 +35,14 @@ const recalculateBalances = (group) => {
   // 3. Process all settlements
   if (Array.isArray(group.settlements)) {
     group.settlements.forEach(settlement => {
-      // The person who sent the money ("from") has paid down their debt -> reduce their debt (meaning add to their balance, wait let's follow the prompt exactly)
-      // User Prompt: "For each settlement: deducts from "from", adds to "to""
+      // Settlement semantics (Splitwise-style):
+      // - "from" paid money -> their net balance increases (they owe less)
+      // - "to" received money -> their net balance decreases (they are owed less)
       const fromBal = balances.get(settlement.from) || 0;
-      balances.set(settlement.from, fromBal - settlement.amount);
+      balances.set(settlement.from, fromBal + settlement.amount);
 
       const toBal = balances.get(settlement.to) || 0;
-      balances.set(settlement.to, toBal + settlement.amount);
+      balances.set(settlement.to, toBal - settlement.amount);
     });
   }
 

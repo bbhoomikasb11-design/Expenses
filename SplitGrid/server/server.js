@@ -31,9 +31,23 @@ app.get('/', (req, res) => res.send('SplitGrid Backend is running successfully! 
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI;
 
-mongoose.connect(MONGO_URI)
-  .then(() => console.log('✅ Connected to MongoDB'))
-  .catch(err => console.error('MongoDB connection error:', err));
+if (!MONGO_URI) {
+  console.error('Missing MONGO_URI in server/.env');
+  process.exit(1);
+}
+
+mongoose
+  .connect(MONGO_URI, { dbName: 'SplitGrid' })
+  .then(() => console.log('✅ Connected to MongoDB (db: SplitGrid)'))
+  .catch((err) => {
+    console.error('MongoDB connection error:', err?.message || err);
+    if (err?.message?.toLowerCase?.().includes('bad auth')) {
+      console.error('Auth failed. Verify MongoDB Atlas username/password in MONGO_URI.');
+    }
+    if (err?.message?.toLowerCase?.().includes('ip') || err?.message?.toLowerCase?.().includes('whitelist')) {
+      console.error('Network blocked. Add your IP in MongoDB Atlas Network Access allowlist.');
+    }
+  });
 
 server.listen(PORT, () => {
   console.log(`🚀 Server listening on port ${PORT}`);

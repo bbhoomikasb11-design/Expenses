@@ -45,7 +45,7 @@ const CreateGroup = () => {
     try {
       const res = await createGroup({ groupName, emoji, groupType, members });
       confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-      setTimeout(() => navigate(`/group/${res.data._id}`), 1000);
+      setTimeout(() => navigate(`/invite/${res.data._id}`), 1000);
     } catch (error) {
       toast.error('Launch failed. Try again.');
       setIsSubmitting(false);
